@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bouncing Balls Animation</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        canvas {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            display: block;
+            margin: 0 auto;
+        }
+
+        .controls {
+            margin-top: 15px;
+            text-align: center;
+        }
+
+        button {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Bouncing Balls Animation</h1>
+        <canvas id="canvas" width="800" height="400"></canvas>
+        <div class="controls">
+            <button onclick="toggleAnimation()">Pause/Resume</button>
+            <button onclick="addBall()">Add Ball</button>
+            <button onclick="resetAnimation()">Reset</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        let animationId;
+        let isRunning = true;
+
+        class Ball {
+            constructor(x, y, radius, color) {
+                this.x = x;
+                this.y = y;
+                this.radius = radius;
+                this.color = color;
+                this.dx = (Math.random() - 0.5) * 8 + 2; // Random velocity
+                this.dy = (Math.random() - 0.5) * 8 + 2;
+                this.gravity = 0.15;
+                this.friction = 0.995;
+                this.bounce = 0.85;
+                this.isClicked = false;
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                
+                // Add glow effect when clicked
+                if (this.isClicked) {
+                    ctx.shadowColor = this.color;
+                    ctx.shadowBlur = 20;
+                    ctx.fillStyle = this.color;
+                } else {
+                    ctx.shadowBlur = 0;
+                    ctx.fillStyle = this.color;
+                }
+                
+                ctx.fill();
+                ctx.closePath();
+
+                // Add shadow effect
+                ctx.beginPath();
+                ctx.arc(this.x + 2, this.y + 2, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.fill();
+                ctx.closePath();
+            }
+
+            update() {
+                // Apply gravity
+                this.dy += this.gravity;
+
+                // Apply friction
+                this.dx *= this.friction;
+                this.dy *= this.friction;
+
+                // Update position
+                this.x += this.dx;
+                this.y += this.dy;
+
+                // Bounce off walls
+                if (this.x + this.radius > canvas.width || this.x - this.radius < 0) {
+                    this.dx = -this.dx * this.bounce;
+                    this.x = Math.max(this.radius, Math.min(canvas.width - this.radius, this.x));
+                }
+
+                if (this.y + this.radius > canvas.height || this.y - this.radius < 0) {
+                    this.dy = -this.dy * this.bounce;
+                    this.y = Math.max(this.radius, Math.min(canvas.height - this.radius, this.y));
+                }
+
+                // Keep balls moving with minimal energy
+                if (Math.abs(this.dx) < 0.05 && Math.abs(this.dy) < 0.05 && this.y > canvas.height - this.radius - 5) {
+                    this.dy = -Math.random() * 3 - 2; // Small random bounce
+                }
+            }
+
+            bounceBall() {
+                this.dy = -Math.random() * 8 - 5; // Strong upward bounce
+                this.dx += (Math.random() - 0.5) * 4; // Add some horizontal movement
+                this.isClicked = true;
+                
+                // Reset click state after a short time
+                setTimeout(() => {
+                    this.isClicked = false;
+                }, 200);
+            }
+
+            checkCollision(other) {
+                const dx = this.x - other.x;
+                const dy = this.y - other.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < this.radius + other.radius) {
+                    // Collision response
+                    const angle = Math.atan2(dy, dx);
+                    const sin = Math.sin(angle);
+                    const cos = Math.cos(angle);
+
+                    // Rotate velocities
+                    const vx1 = this.dx * cos + this.dy * sin;
+                    const vy1 = this.dy * cos - this.dx * sin;
+                    const vx2 = other.dx * cos + other.dy * sin;
+                    const vy2 = other.dy * cos - other.dx * sin;
+
+                    // Swap velocities
+                    this.dx = vx2 * cos - vy1 * sin;
+                    this.dy = vy1 * cos + vx2 * sin;
+                    other.dx = vx1 * cos - vy2 * sin;
+                    other.dy = vy2 * cos + vx1 * sin;
+
+                    // Move balls apart to prevent sticking
+                    const overlap = (this.radius + other.radius - distance) / 2;
+                    const moveX = overlap * cos;
+                    const moveY = overlap * sin;
+                    
+                    this.x += moveX;
+                    this.y += moveY;
+                    other.x -= moveX;
+                    other.y -= moveY;
+                }
+            }
+        }
+
+        let balls = [];
+
+        function initBalls() {
+            balls = [
+                new Ball(100, 100, 20, '#ff4757'), // Red ball
+                new Ball(200, 150, 25, '#3742fa'), // Blue ball
+                new Ball(300, 200, 18, '#ff4757'), // Red ball
+                new Ball(400, 100, 22, '#3742fa'), // Blue ball
+                new Ball(500, 250, 20, '#ff4757')  // Red ball
+            ];
+        }
+
+        function addBall() {
+            const colors = ['#ff4757', '#3742fa']; // Red and Blue
+            const randomColor = colors[Math.floor(Math.random() * colors.length)];
+            const randomRadius = Math.random() * 15 + 15; // 15-30 radius
+            const randomX = Math.random() * (canvas.width - 60) + 30;
+            const randomY = Math.random() * (canvas.height - 60) + 30;
+            
+            balls.push(new Ball(randomX, randomY, randomRadius, randomColor));
+        }
+
+        function animate() {
+            if (!isRunning) return;
+
+            // Clear canvas with fade effect
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Update and draw balls
+            for (let i = 0; i < balls.length; i++) {
+                balls[i].update();
+                balls[i].draw();
+
+                // Check collisions with other balls
+                for (let j = i + 1; j < balls.length; j++) {
+                    balls[i].checkCollision(balls[j]);
+                }
+            }
+
+            animationId = requestAnimationFrame(animate);
+        }
+
+        function toggleAnimation() {
+            isRunning = !isRunning;
+            if (isRunning) {
+                animate();
+            } else {
+                cancelAnimationFrame(animationId);
+            }
+        }
+
+        function resetAnimation() {
+            cancelAnimationFrame(animationId);
+            initBalls();
+            isRunning = true;
+            animate();
+        }
+
+        // Initialize and start animation
+        initBalls();
+        animate();
+
+        // Add click detection for bouncing balls
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            let ballClicked = false;
+            
+            // Check if any ball was clicked
+            for (let i = balls.length - 1; i >= 0; i--) {
+                const ball = balls[i];
+                const distance = Math.sqrt((x - ball.x) ** 2 + (y - ball.y) ** 2);
+                
+                if (distance <= ball.radius) {
+                    ball.bounceBall();
+                    ballClicked = true;
+                    break; // Only bounce one ball per click
+                }
+            }
+            
+            // If no ball was clicked, add a new ball
+            if (!ballClicked) {
+                const colors = ['#ff4757', '#3742fa'];
+                const randomColor = colors[Math.floor(Math.random() * colors.length)];
+                const randomRadius = Math.random() * 15 + 15;
+                
+                balls.push(new Ball(x, y, randomRadius, randomColor));
+            }
+        });
+    </script>
+</body>
+</html> 
