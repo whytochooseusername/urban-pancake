@@ -65,16 +65,62 @@
         button:active {
             transform: translateY(0);
         }
+
+        .advanced-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        .advanced-controls label {
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        input[type="range"] {
+            vertical-align: middle;
+            cursor: pointer;
+        }
+
+        input[type="color"] {
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 5px;
+            cursor: pointer;
+            background: transparent;
+            width: 30px;
+            height: 30px;
+        }
+
+        input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+
+        input[type="color"]::-webkit-color-swatch {
+            border: none;
+            border-radius: 3px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Bouncing Balls Animation</h1>
+        <h1>Bouncing Balls | Count: <span id="ball-count">0</span></h1>
         <canvas id="canvas" width="800" height="400"></canvas>
         <div class="controls">
             <button onclick="toggleAnimation()">Pause/Resume</button>
             <button onclick="addBall()">Add Ball</button>
             <button onclick="resetAnimation()">Reset</button>
+        </div>
+        <div class="controls advanced-controls">
+            <label>Color: <input type="color" id="color-picker" value="#ff4757"></label>
+            <label>Size: <input type="range" id="size-slider" min="5" max="40" value="20"> <span id="size-value">20</span></label>
+            <label>Gravity: <input type="range" id="gravity-slider" min="0" max="1" step="0.05" value="0.15"> <span id="gravity-value">0.15</span></label>
+            <label>Friction: <input type="range" id="friction-slider" min="0.9" max="1" step="0.005" value="0.995"> <span id="friction-value">0.995</span></label>
         </div>
     </div>
 
@@ -82,8 +128,21 @@
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
 
+        // --- Control Elements ---
+        const colorPicker = document.getElementById('color-picker');
+        const sizeSlider = document.getElementById('size-slider');
+        const sizeValue = document.getElementById('size-value');
+        const gravitySlider = document.getElementById('gravity-slider');
+        const gravityValue = document.getElementById('gravity-value');
+        const frictionSlider = document.getElementById('friction-slider');
+        const frictionValue = document.getElementById('friction-value');
+
         let animationId;
         let isRunning = true;
+
+        // --- Global Physics Properties ---
+        let gravity = 0.15;
+        let friction = 0.995;
 
         class Ball {
             constructor(x, y, radius, color) {
@@ -93,8 +152,6 @@
                 this.color = color;
                 this.dx = (Math.random() - 0.5) * 8 + 2; // Random velocity
                 this.dy = (Math.random() - 0.5) * 8 + 2;
-                this.gravity = 0.15;
-                this.friction = 0.995;
                 this.bounce = 0.85;
                 this.isClicked = false;
             }
@@ -102,8 +159,7 @@
             draw() {
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-                
-                // Add glow effect when clicked
+
                 if (this.isClicked) {
                     ctx.shadowColor = this.color;
                     ctx.shadowBlur = 20;
@@ -112,11 +168,10 @@
                     ctx.shadowBlur = 0;
                     ctx.fillStyle = this.color;
                 }
-                
+
                 ctx.fill();
                 ctx.closePath();
 
-                // Add shadow effect
                 ctx.beginPath();
                 ctx.arc(this.x + 2, this.y + 2, this.radius, 0, Math.PI * 2);
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
@@ -125,18 +180,16 @@
             }
 
             update() {
-                // Apply gravity
-                this.dy += this.gravity;
+                // Apply global gravity
+                this.dy += gravity;
 
-                // Apply friction
-                this.dx *= this.friction;
-                this.dy *= this.friction;
+                // Apply global friction
+                this.dx *= friction;
+                this.dy *= friction;
 
-                // Update position
                 this.x += this.dx;
                 this.y += this.dy;
 
-                // Bounce off walls
                 if (this.x + this.radius > canvas.width || this.x - this.radius < 0) {
                     this.dx = -this.dx * this.bounce;
                     this.x = Math.max(this.radius, Math.min(canvas.width - this.radius, this.x));
@@ -147,18 +200,16 @@
                     this.y = Math.max(this.radius, Math.min(canvas.height - this.radius, this.y));
                 }
 
-                // Keep balls moving with minimal energy
                 if (Math.abs(this.dx) < 0.05 && Math.abs(this.dy) < 0.05 && this.y > canvas.height - this.radius - 5) {
-                    this.dy = -Math.random() * 3 - 2; // Small random bounce
+                    this.dy = -Math.random() * 3 - 2;
                 }
             }
 
             bounceBall() {
-                this.dy = -Math.random() * 8 - 5; // Strong upward bounce
-                this.dx += (Math.random() - 0.5) * 4; // Add some horizontal movement
+                this.dy = -Math.random() * 8 - 5;
+                this.dx += (Math.random() - 0.5) * 4;
                 this.isClicked = true;
-                
-                // Reset click state after a short time
+
                 setTimeout(() => {
                     this.isClicked = false;
                 }, 200);
@@ -170,28 +221,24 @@
                 const distance = Math.sqrt(dx * dx + dy * dy);
 
                 if (distance < this.radius + other.radius) {
-                    // Collision response
                     const angle = Math.atan2(dy, dx);
                     const sin = Math.sin(angle);
                     const cos = Math.cos(angle);
 
-                    // Rotate velocities
                     const vx1 = this.dx * cos + this.dy * sin;
                     const vy1 = this.dy * cos - this.dx * sin;
                     const vx2 = other.dx * cos + other.dy * sin;
                     const vy2 = other.dy * cos - other.dx * sin;
 
-                    // Swap velocities
                     this.dx = vx2 * cos - vy1 * sin;
                     this.dy = vy1 * cos + vx2 * sin;
                     other.dx = vx1 * cos - vy2 * sin;
                     other.dy = vy2 * cos + vx1 * sin;
 
-                    // Move balls apart to prevent sticking
                     const overlap = (this.radius + other.radius - distance) / 2;
                     const moveX = overlap * cos;
                     const moveY = overlap * sin;
-                    
+
                     this.x += moveX;
                     this.y += moveY;
                     other.x -= moveX;
@@ -202,44 +249,50 @@
 
         let balls = [];
 
+        function updateBallCount() {
+            const ballCountElement = document.getElementById('ball-count');
+            if (ballCountElement) {
+                ballCountElement.textContent = balls.length;
+            }
+        }
+
+        function createNewBall(x, y) {
+            const radius = parseFloat(sizeSlider.value);
+            const color = colorPicker.value;
+            balls.push(new Ball(x, y, radius, color));
+            updateBallCount();
+        }
+
         function initBalls() {
             balls = [
-                new Ball(100, 100, 20, '#ff4757'), // Red ball
-                new Ball(200, 150, 25, '#3742fa'), // Blue ball
-                new Ball(300, 200, 18, '#ff4757'), // Red ball
-                new Ball(400, 100, 22, '#3742fa'), // Blue ball
-                new Ball(500, 250, 20, '#ff4757')  // Red ball
+                new Ball(100, 100, 20, '#ff4757'),
+                new Ball(200, 150, 25, '#3742fa'),
+                new Ball(300, 200, 18, '#ff4757'),
+                new Ball(400, 100, 22, '#3742fa'),
+                new Ball(500, 250, 20, '#ff4757')
             ];
+            updateBallCount();
         }
 
         function addBall() {
-            const colors = ['#ff4757', '#3742fa']; // Red and Blue
-            const randomColor = colors[Math.floor(Math.random() * colors.length)];
-            const randomRadius = Math.random() * 15 + 15; // 15-30 radius
-            const randomX = Math.random() * (canvas.width - 60) + 30;
-            const randomY = Math.random() * (canvas.height - 60) + 30;
-            
-            balls.push(new Ball(randomX, randomY, randomRadius, randomColor));
+            const radius = parseFloat(sizeSlider.value);
+            const randomX = Math.random() * (canvas.width - radius * 2) + radius;
+            const randomY = Math.random() * (canvas.height - radius * 2) + radius;
+
+            createNewBall(randomX, randomY);
         }
 
         function animate() {
             if (!isRunning) return;
-
-            // Clear canvas with fade effect
             ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Update and draw balls
             for (let i = 0; i < balls.length; i++) {
                 balls[i].update();
                 balls[i].draw();
-
-                // Check collisions with other balls
                 for (let j = i + 1; j < balls.length; j++) {
                     balls[i].checkCollision(balls[j]);
                 }
             }
-
             animationId = requestAnimationFrame(animate);
         }
 
@@ -259,39 +312,42 @@
             animate();
         }
 
-        // Initialize and start animation
-        initBalls();
-        animate();
+        // --- Event Listeners ---
+        sizeSlider.addEventListener('input', () => sizeValue.textContent = sizeSlider.value);
+        gravitySlider.addEventListener('input', () => {
+            gravity = parseFloat(gravitySlider.value);
+            gravityValue.textContent = gravitySlider.value;
+        });
+        frictionSlider.addEventListener('input', () => {
+            friction = parseFloat(frictionSlider.value);
+            frictionValue.textContent = frictionSlider.value;
+        });
 
-        // Add click detection for bouncing balls
         canvas.addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
-            
+
             let ballClicked = false;
-            
-            // Check if any ball was clicked
             for (let i = balls.length - 1; i >= 0; i--) {
                 const ball = balls[i];
                 const distance = Math.sqrt((x - ball.x) ** 2 + (y - ball.y) ** 2);
-                
+
                 if (distance <= ball.radius) {
                     ball.bounceBall();
                     ballClicked = true;
-                    break; // Only bounce one ball per click
+                    break;
                 }
             }
-            
-            // If no ball was clicked, add a new ball
+
             if (!ballClicked) {
-                const colors = ['#ff4757', '#3742fa'];
-                const randomColor = colors[Math.floor(Math.random() * colors.length)];
-                const randomRadius = Math.random() * 15 + 15;
-                
-                balls.push(new Ball(x, y, randomRadius, randomColor));
+                createNewBall(x, y);
             }
         });
+
+        // --- Initialize ---
+        initBalls();
+        animate();
     </script>
 </body>
-</html> 
+</html>
